@@ -1,0 +1,21 @@
+# Virtual environment
+.venv/
+venv/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Model checkpoints
+models/
+checkpoint-*/
+
+# Cache
+.cache/
+
+# Personal/local files
+dlSplit.py
+dlpj.py
+hw3.py
+pii_dataset.csv
+speedup.png
