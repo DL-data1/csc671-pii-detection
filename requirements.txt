@@ -3,3 +3,4 @@ transformers
 datasets
 seqeval
 pandas
+accelerate
