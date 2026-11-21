@@ -1,12 +1,60 @@
 Small checkpoint test results
 
-NAME_STUDENT: detected correctly
-STREET_ADDRESS: detected correctly
-PHONE_NUM: detected correctly
-EMAIL: detected correctly
-USERNAME: failed
-  - maria99 predicted as EMAIL
-  - aliceb not detected
+Model: models/distilbert-small
 
-URL_PERSONAL: failed
-  - https://example.com not detected
+Overall summary
+---------------
+NAME_STUDENT: PASS
+- Names were detected correctly in all tested examples.
+
+STREET_ADDRESS: PASS
+- Addresses were detected correctly in all tested examples.
+
+PHONE_NUM: PASS
+- Phone numbers were detected correctly in all tested examples.
+
+EMAIL: PARTIAL
+- Correctly detected:
+  - john@example.com
+  - alice@test.com
+  - david.kim@example.com
+  - emily@example.org
+  - john@example.com
+  - alice@example.com
+- Missed:
+  - test@example.net
+  - robert@test.com
+- False positives:
+  - maria99 was predicted as EMAIL instead of USERNAME.
+  - sarahlee88 was predicted as EMAIL instead of USERNAME.
+
+USERNAME: FAIL on current small checkpoint
+- maria99 -> predicted as EMAIL
+- aliceb -> not detected
+- sarahlee88 -> predicted as EMAIL
+- dk123 -> not detected
+- testuser99 -> not detected
+- roberts88 -> not detected
+
+URL_PERSONAL: FAIL on current small checkpoint
+- https://example.com -> not detected
+- https://davidkim.dev -> not detected
+- https://example.net -> not detected
+- https://robertsmith.me -> not detected
+
+No-PII example: PASS
+- The sentence with no personal information returned no detected entities.
+
+Long-input sliding-window test: PASS
+- A long input was split into 3 windows.
+- PII near the end of the input was still detected after the first 512 subword tokens.
+- John Smith and john@example.com were detected correctly.
+
+Notes
+-----
+- The inference pipeline is working end-to-end.
+- Highlighted text, JSON output, redaction, and sliding-window inference are working.
+- The current small checkpoint is weak on USERNAME and URL_PERSONAL.
+- Some EMAIL predictions are also inconsistent.
+- Punctuation may be included in detected spans because training uses whitespace-split words with punctuation attached.
+- Re-run the same examples with Kyle's best checkpoint for the final comparison.
