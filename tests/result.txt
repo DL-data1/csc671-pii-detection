@@ -1,0 +1,12 @@
+Small checkpoint test results
+
+NAME_STUDENT: detected correctly
+STREET_ADDRESS: detected correctly
+PHONE_NUM: detected correctly
+EMAIL: detected correctly
+USERNAME: failed
+  - maria99 predicted as EMAIL
+  - aliceb not detected
+
+URL_PERSONAL: failed
+  - https://example.com not detected

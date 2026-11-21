@@ -1,0 +1,5 @@
+My name is John Smith, my email is john@example.com, and my phone number is 415-555-1234.
+
+Maria Lopez lives at 123 Market Street. Her username is maria99 and her personal website is https://example.com.
+
+Contact Alice Brown at alice@test.com or call 650-555-9876. She lives at 99 Mission Street and uses the username aliceb.

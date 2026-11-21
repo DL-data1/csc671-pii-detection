@@ -1,8 +1,9 @@
 import argparse
 import re
-
+import json
 import torch
 from transformers import AutoTokenizer, AutoModelForTokenClassification
+
 """
 DistilBERT PII inference script.
 
@@ -95,11 +96,7 @@ def merge_bio_predictions(words, offsets, labels):
             if current is not None:
                 entities.append(current)
 
-            current = {
-                "type": entity_type,
-                "start": start,
-                "end": end
-            }
+            current = {"type": entity_type, "start": start, "end": end}
 
         elif prefix == "I":
             if current is not None and current["type"] == entity_type:
@@ -109,16 +106,13 @@ def merge_bio_predictions(words, offsets, labels):
                 if current is not None:
                     entities.append(current)
 
-                current = {
-                    "type": entity_type,
-                    "start": start,
-                    "end": end
-                }
+                current = {"type": entity_type, "start": start, "end": end}
 
     if current is not None:
         entities.append(current)
 
     return entities
+
 
 def highlight_text(text, entities):
     result = ""
@@ -131,10 +125,26 @@ def highlight_text(text, entities):
 
         result += text[last_end:start]
 
-        result += (
-            f"[[{entity_type}: "
-            f"{text[start:end]}]]"
-        )
+        result += f"[[{entity_type}: " f"{text[start:end]}]]"
+
+        last_end = end
+
+    result += text[last_end:]
+
+    return result
+
+
+def redact_text(text, entities):
+    result = ""
+    last_end = 0
+
+    for entity in entities:
+        start = entity["start"]
+        end = entity["end"]
+        entity_type = entity["type"]
+
+        result += text[last_end:start]
+        result += f"[{entity_type}]"
 
         last_end = end
 
@@ -145,25 +155,17 @@ def highlight_text(text, entities):
 
 def predict(model_path, text):
 
-    device = torch.device(
-        "cuda" if torch.cuda.is_available() else "cpu"
-    )
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     print("Device:", device)
 
-    tokenizer = AutoTokenizer.from_pretrained(
-        model_path,
-        use_fast=True
-    )
+    tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=True)
 
-    model = AutoModelForTokenClassification.from_pretrained(
-        model_path
-    )
+    model = AutoModelForTokenClassification.from_pretrained(model_path)
 
     model.to(device)
     model.eval()
 
- 
     words, offsets = split_words_with_offsets(text)
 
     encoding = tokenizer(
@@ -171,56 +173,66 @@ def predict(model_path, text):
         is_split_into_words=True,
         truncation=True,
         max_length=512,
-        return_tensors="pt"
+        stride=128,
+        return_overflowing_tokens=True,
+        padding="max_length",
+        return_tensors="pt",
     )
-
-    word_ids = encoding.word_ids(batch_index=0)
 
     model_inputs = {
         key: value.to(device)
         for key, value in encoding.items()
+        if key in tokenizer.model_input_names
     }
 
     with torch.no_grad():
         outputs = model(**model_inputs)
 
-    predicted_ids = torch.argmax(
-        outputs.logits,
-        dim=-1
-    )[0].cpu().tolist()
+    predicted_ids = torch.argmax(outputs.logits, dim=-1).cpu().tolist()
+
+    word_predictions = {}
+
+    num_windows = len(predicted_ids)
+
+    for window_index in range(num_windows):
+
+        word_ids = encoding.word_ids(batch_index=window_index)
+
+        seen_in_window = set()
+
+        for token_index, word_id in enumerate(word_ids):
+
+            if word_id is None:
+                continue
+
+            # Use only the first subword of each word
+            if word_id in seen_in_window:
+                continue
+
+            seen_in_window.add(word_id)
+
+            # The same word may appear in overlapping windows.
+            # Keep the first prediction we see.
+            if word_id in word_predictions:
+                continue
+
+            label_id = predicted_ids[window_index][token_index]
+
+            label = model.config.id2label[label_id]
+
+            word_predictions[word_id] = label
 
     word_labels = []
-    seen_word_ids = set()
 
-    for token_index, word_id in enumerate(word_ids):
-
-        if word_id is None:
-            continue
-
-        if word_id in seen_word_ids:
-            continue
-
-        seen_word_ids.add(word_id)
-
-        label_id = predicted_ids[token_index]
-
-        label = model.config.id2label[label_id]
-
+    for word_id in range(len(words)):
+        label = word_predictions.get(word_id, "O")
         word_labels.append(label)
 
-    processed_count = len(word_labels)
+    entities = merge_bio_predictions(words, offsets, word_labels)
 
-    processed_words = words[:processed_count]
-    processed_offsets = offsets[:processed_count]
+    print("Windows processed:", num_windows)
 
-    entities = merge_bio_predictions(
-        processed_words,
-        processed_offsets,
-        word_labels
-    )
-
-    return entities, processed_count, len(words)
-
+    return entities, len(words), len(words)
 
 
 def main():
@@ -229,23 +241,18 @@ def main():
         description="Detect PII using a DistilBERT checkpoint"
     )
 
-    parser.add_argument(
-        "--model",
-        required=True,
-        help="Path to checkpoint directory"
-    )
+    parser.add_argument("--model", required=True, help="Path to checkpoint directory")
 
+    parser.add_argument("text", help="Text to scan for PII")
     parser.add_argument(
-        "text",
-        help="Text to scan for PII"
+        "--redact",
+        action="store_true",
+        help="Replace detected PII with entity type labels",
     )
 
     args = parser.parse_args()
 
-    entities, processed, total = predict(
-        args.model,
-        args.text
-    )
+    entities, processed, total = predict(args.model, args.text)
 
     print("\nDetected PII:")
     print("-" * 70)
@@ -256,9 +263,7 @@ def main():
     else:
         for entity in entities:
 
-            span = args.text[
-                entity["start"]:entity["end"]
-            ]
+            span = args.text[entity["start"] : entity["end"]]
 
             print(
                 f"{span!r:30} "
@@ -268,18 +273,32 @@ def main():
 
     print("\nHighlighted text:")
     print("-" * 70)
+    print(highlight_text(args.text, entities))
 
-    print(
-        highlight_text(
-            args.text,
-            entities
+    json_entities = []
+
+    for entity in entities:
+        json_entities.append(
+            {
+                "type": entity["type"],
+                "text": args.text[entity["start"] : entity["end"]],
+                "start": entity["start"],
+                "end": entity["end"],
+            }
         )
-    )
+
+    print("\nJSON output:")
+    print("-" * 70)
+    print(json.dumps(json_entities, indent=2, ensure_ascii=False))
+
+    if args.redact:
+        print("\nRedacted text:")
+        print("-" * 70)
+        print(redact_text(args.text, entities))
 
     if processed < total:
         print(
-            f"\nWarning: input was truncated "
-            f"({processed}/{total} words processed)."
+            f"\nWarning: input was truncated " f"({processed}/{total} words processed)."
         )
 
 

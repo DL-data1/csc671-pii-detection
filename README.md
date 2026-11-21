@@ -25,11 +25,26 @@ The label set lives in `src/labels.py` (13 BIO tags). The checkpoint's `config.j
 
 ## Inference
 
-Run PII detection with a compatible token-classification checkpoint:
+Run PII detection with a compatible checkpoint:
 
 ```bash
 python scripts/predict.py --model models/distilbert-small "My name is John Smith and my email is john@example.com."
 ```
+
+Optional redaction mode:
+
+```bash
+python scripts/predict.py --model models/distilbert-small --redact "My name is John Smith and my email is john@example.com."
+```
+
+The inference script supports:
+
+- highlighted PII spans
+- JSON output with `type`, `text`, `start`, and `end`
+- optional PII redaction
+- sliding-window inference for inputs longer than 512 subword tokens
+
+Example prompts are available in `tests/examples.txt`.
 
 The script loads the tokenizer and model from the checkpoint directory, merges BIO predictions into complete PII spans, and prints the detected entity type, character offsets, and highlighted text.
 
@@ -46,4 +61,4 @@ Highlighted text:
 My name is [[NAME_STUDENT: John Smith]] and my email is [[EMAIL: john@example.com.]]
 ```
 
-The current implementation truncates inputs longer than 512 subword tokens.
+Long inputs are handled with sliding-window inference so text beyond the first 512 subword tokens can also be processed.
