@@ -155,18 +155,28 @@ def redact_text(text, entities):
 
 def predict(model_path, text):
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device(
+        "cuda" if torch.cuda.is_available() else "cpu"
+    )
 
     print("Device:", device)
 
-    tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=True)
+    tokenizer = AutoTokenizer.from_pretrained(
+        model_path,
+        use_fast=True
+    )
 
-    model = AutoModelForTokenClassification.from_pretrained(model_path)
+    model = AutoModelForTokenClassification.from_pretrained(
+        model_path
+    )
 
     model.to(device)
     model.eval()
 
     words, offsets = split_words_with_offsets(text)
+
+    if not words:
+        return [], 0, 0
 
     encoding = tokenizer(
         words,
@@ -176,7 +186,7 @@ def predict(model_path, text):
         stride=128,
         return_overflowing_tokens=True,
         padding="max_length",
-        return_tensors="pt",
+        return_tensors="pt"
     )
 
     model_inputs = {
@@ -188,15 +198,18 @@ def predict(model_path, text):
     with torch.no_grad():
         outputs = model(**model_inputs)
 
-    predicted_ids = torch.argmax(outputs.logits, dim=-1).cpu().tolist()
+    all_logits = outputs.logits.detach().cpu()
 
-    word_predictions = {}
+    num_windows = all_logits.shape[0]
 
-    num_windows = len(predicted_ids)
+    word_logit_sums = {}
+    word_logit_counts = {}
 
     for window_index in range(num_windows):
 
-        word_ids = encoding.word_ids(batch_index=window_index)
+        word_ids = encoding.word_ids(
+            batch_index=window_index
+        )
 
         seen_in_window = set()
 
@@ -210,27 +223,50 @@ def predict(model_path, text):
 
             seen_in_window.add(word_id)
 
+            logits = all_logits[
+                window_index,
+                token_index
+            ]
 
-            if word_id in word_predictions:
-                continue
-
-            label_id = predicted_ids[window_index][token_index]
-
-            label = model.config.id2label[label_id]
-
-            word_predictions[word_id] = label
+            if word_id not in word_logit_sums:
+                word_logit_sums[word_id] = logits.clone()
+                word_logit_counts[word_id] = 1
+            else:
+                word_logit_sums[word_id] += logits
+                word_logit_counts[word_id] += 1
 
     word_labels = []
+    processed_count = 0
 
     for word_id in range(len(words)):
-        label = word_predictions.get(word_id, "O")
-        word_labels.append(label)
 
-    entities = merge_bio_predictions(words, offsets, word_labels)
+        if word_id not in word_logit_sums:
+            word_labels.append("O")
+            continue
+
+        average_logits = (
+            word_logit_sums[word_id]
+            / word_logit_counts[word_id]
+        )
+
+        label_id = torch.argmax(
+            average_logits
+        ).item()
+
+        label = model.config.id2label[label_id]
+
+        word_labels.append(label)
+        processed_count += 1
+
+    entities = merge_bio_predictions(
+        words,
+        offsets,
+        word_labels
+    )
 
     print("Windows processed:", num_windows)
 
-    return entities, len(words), len(words)
+    return entities, processed_count, len(words)
 
 
 def main():

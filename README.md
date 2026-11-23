@@ -38,7 +38,7 @@ The label set lives in `src/labels.py` (13 BIO tags). The checkpoint's `config.j
 
 
 ## Inference
-
+Current inference checkpoint: models/full_baseline
 Run PII detection with a compatible checkpoint:
 
 ```bash

@@ -29,7 +29,7 @@ from predict import predict, highlight_text, redact_text
 
 
 
-MODEL_PATH = "models/distilbert-small"
+MODEL_PATH = "models/full_baseline"
 
 
 def run_detection(text):
