@@ -205,14 +205,12 @@ def predict(model_path, text):
             if word_id is None:
                 continue
 
-            # Use only the first subword of each word
             if word_id in seen_in_window:
                 continue
 
             seen_in_window.add(word_id)
 
-            # The same word may appear in overlapping windows.
-            # Keep the first prediction we see.
+
             if word_id in word_predictions:
                 continue
 
