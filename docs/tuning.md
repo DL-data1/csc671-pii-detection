@@ -8,7 +8,7 @@ All decisions below use the **validation** split only; the test split was never 
 
 1. **Noise floor first.** The baseline config was run with 3 seeds (42, 43, 44): F1 **0.971 ± 0.002**. A single entity is ~0.05 points of micro F1, and USERNAME / URL F1 move ~1.5 points per entity (64-76 val entities), so differences below a few tenths of a point are noise.
 2. **One-change-at-a-time sweep** (`scripts/tune_sweep.sh`), each run picking its best epoch on validation.
-3. **Rule fixed before looking:** a change counts only if it beats the baseline by more than the seed spread; finalists are re-run on 3 seeds.
+3. **Rule fixed before looking:** a change counts only if it beats the baseline by more than the seed spread. Uncased, the clear leader, was re-run on 3 seeds; 8 epochs is a single seed and was not re-run because uncased beat it on every comparison.
 4. **Generalization tie-break** (`scripts/holdout_check.sh`): because all prompt templates appear in every split, validation only measures in-template performance. The finalists were retrained with one whole prompt style removed and scored on it (below). The rule, again fixed in advance: prefer cased only if it beats uncased there by more than ~1 point.
 
 ## Sweep results (validation, best epoch)
@@ -19,7 +19,7 @@ All decisions below use the **validation** split only; the test split was never 
 | lr 3e-5 | 0.972 | 0.958 | noise |
 | lr 8e-5 | 0.971 | 0.956 | noise |
 | batch 16 | 0.971 | 0.957 | noise |
-| 8 epochs | 0.977 | 0.964 | better (best epoch 7) |
+| 8 epochs (1 seed) | 0.977 | 0.964 | better (best epoch 7) |
 | class weights, sqrt-inverse, cap 10 (all PII labels ×10 vs `O`) | 0.962 | 0.943 | **worse** |
 | class weights, sqrt-inverse, cap 50 (URL/USERNAME ×43-46) | 0.963 | 0.935 | **worse** |
 | **uncased** (3 seeds) | **0.985 ± 0.001** | **0.976** | **much better** |
@@ -38,7 +38,9 @@ A plausible (untested) explanation: the uncased tokenizer lowercases and strips 
 
 ## Generalization check: unseen prompt style
 
-The 8 prompt templates are 4 prompt styles × 2 variants (0/4, 1/5, 2/6, 3/7 share the same instructions), so holding out one template is not really unseen. Style 0/4 was removed from train and validation, and the best checkpoint was scored once on its 628 train+val documents. Templates 6/7 (suggested on #1 as a possible team test set) were not touched.
+The 8 prompt templates are 4 prompt styles × 2 variants (0/4, 1/5, 2/6, 3/7 share the same instructions), so holding out one template is not really unseen. Style 0/4 was removed from train and validation, and the best checkpoint was scored once on its 628 train+val documents.
+
+**For the unseen-style test in #4 / #7:** style 0/4 has now been used for model selection, so it should not be the reported generalization test. Hold out a different whole style (1/5, 2/6 or 3/7). Holding out only templates 6 and 7, as first suggested on #1, is not unseen, because their twins 2 and 3 stay in training. The final model was trained on every style, so an unseen-style number needs a model retrained without that style: `python scripts/train.py --model-name distilbert-base-uncased --holdout-prompt-ids 2 6` (for example) does that and scores the held-out style's train+val documents. Scoring test documents of that style also works, as long as no test documents are used for choices.
 
 | config | val F1 (other styles) | **unseen-style F1** | ADDRESS | USERNAME |
 |---|---|---|---|---|
