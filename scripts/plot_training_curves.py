@@ -62,8 +62,9 @@ plt.rcParams.update(
         "pdf.fonttype": 42,  # embed TrueType fonts (IEEE PDF eXpress requirement)
         "ps.fonttype": 42,
         "savefig.dpi": 600,
-        "savefig.bbox": "tight",
-        "savefig.pad_inches": 0.02,
+        "figure.constrained_layout.use": True,  # exact 3.5 in canvas, so 8 pt prints at 8 pt
+        "figure.constrained_layout.h_pad": 0.02,
+        "figure.constrained_layout.w_pad": 0.02,
     }
 )
 
@@ -146,7 +147,6 @@ def fig_loss():
     axes[-1].set_xlabel("Epoch")
     axes[-1].set_xlim(0, 5.1)
     axes[-1].set_xticks(range(0, 6))
-    fig.align_ylabels(axes)
     save(fig, "fig_loss_curves")
 
 
