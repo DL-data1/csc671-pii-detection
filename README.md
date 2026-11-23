@@ -32,6 +32,16 @@ python scripts/train.py --lr 3e-5 --run-name lr3e-5
 - **Outputs:** the best model + tokenizer, `train_info.json` (hyperparameters, per-epoch metrics, loss curve, runtime, GPU) and `val_report.txt` in `models/<run-name>/`. A copy of the summary goes to `docs/results/<run-name>.json` (tracked) for the experiment table. Results are written up in `docs/training.md`.
 - The test split is never used for training or model selection.
 
+## Tuning and final model (issue #8)
+
+The final model is `distilbert-base-uncased` trained with the same recipe (`python scripts/train.py --run-name uncased --model-name distilbert-base-uncased`): validation F1 0.985 vs 0.973 for the cased baseline, and 0.967 vs 0.942 on an unseen prompt style. See `docs/tuning.md` for how it was chosen and `docs/experiments.md` for every run.
+
+- `scripts/tune_sweep.sh`: one-change-at-a-time sweep (seeds, epochs, lr, batch size, class weights, uncased)
+- `scripts/train.py` options: `--model-name`, `--class-weights sqrt --weight-cap N`, `--max-length`, `--stride`, `--holdout-prompt-ids ...`
+- `scripts/holdout_check.sh`: drops prompt style 0/4 from train/val and scores on it (generalization check)
+- `scripts/tune_threshold.py`: `O`-threshold sweep with 2-fold validation halves
+- `scripts/experiment_table.py`: rebuilds `docs/experiments.md` from `docs/results/*.json`
+
 The label set lives in `src/labels.py` (13 BIO tags). The checkpoint's `config.json` stores `id2label`, so any checkpoint directory loads with `AutoModelForTokenClassification.from_pretrained(<dir>)`.
 
 **Inference input:** the training `tokens` are whitespace-split words with punctuation attached (e.g. `"Feng,"`). Split raw text with `text.split()` and tokenize with `is_split_into_words=True`; read each word's label from its first subword.

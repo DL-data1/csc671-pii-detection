@@ -1,0 +1,12 @@
+                precision    recall  f1-score   support
+
+         EMAIL     0.9134    0.9919    0.9510       372
+  NAME_STUDENT     0.9905    0.9933    0.9919      1048
+     PHONE_NUM     0.9297    0.9444    0.9370       252
+STREET_ADDRESS     0.9128    0.9544    0.9331       351
+  URL_PERSONAL     0.7949    0.9688    0.8732        64
+      USERNAME     0.9211    0.9211    0.9211        76
+
+     micro avg     0.9476    0.9778    0.9625      2163
+     macro avg     0.9104    0.9623    0.9346      2163
+  weighted avg     0.9493    0.9778    0.9629      2163
