@@ -76,3 +76,13 @@ My name is [[NAME_STUDENT: John Smith]] and my email is [[EMAIL: john@example.co
 ```
 
 Long inputs are handled with sliding-window inference so text beyond the first 512 subword tokens can also be processed.
+
+## Web UI
+
+A simple Gradio demo is available in scripts/app.py.
+
+Run it from the project root:
+
+python scripts/app.py
+
+Then open the local URL shown in the terminal (usually http://127.0.0.1:7860) in a browser.
