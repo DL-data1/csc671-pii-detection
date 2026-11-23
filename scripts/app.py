@@ -1,6 +1,32 @@
+"""
+Gradio web interface for the PII detection project.
+
+This app provides a simple browser-based demo for the trained
+DistilBERT PII detection model.
+
+The user enters text and clicks the "Detect PII" button.
+The app then:
+
+1. Runs the PII detection model.
+2. Displays detected PII spans in highlighted form.
+3. Shows the detected entities as JSON.
+4. Displays a redacted version of the input text.
+
+Run from the project root with:
+
+    python scripts/app.py
+
+The browser interface will normally be available at:
+
+    http://127.0.0.1:7860
+"""
+
+
 import gradio as gr
 
 from predict import predict, highlight_text, redact_text
+
+
 
 
 MODEL_PATH = "models/distilbert-small"
