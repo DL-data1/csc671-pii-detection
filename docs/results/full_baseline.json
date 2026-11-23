@@ -21,7 +21,7 @@
   "train_windows": 4043,
   "val_docs": 443,
   "val_windows": 499,
-  "best_checkpoint": "C:\\Users\\flimf\\Documents\\Homework\\CSC671 - Deep Learning\\DL-data\\models\\full_baseline\\checkpoints\\checkpoint-2530",
+  "best_checkpoint": "checkpoint-2530",
   "best_val": {
     "precision": 0.9688,
     "recall": 0.9764,

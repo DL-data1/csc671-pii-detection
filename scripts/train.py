@@ -234,7 +234,7 @@ def main():
         "train_windows": len(train_ds),
         "val_docs": len(val_docs),
         "val_windows": len(val_ds),
-        "best_checkpoint": trainer.state.best_model_checkpoint,
+        "best_checkpoint": Path(trainer.state.best_model_checkpoint).name,
         "best_val": best_val,
         "best_val_per_type": per_type,
         "per_epoch_val": epochs,
@@ -252,7 +252,7 @@ def main():
 
     if not args.keep_checkpoints:
         shutil.rmtree(out_dir / "checkpoints", ignore_errors=True)
-    print(f"Best val F1 {best_val['f1']:.4f} ({trainer.state.best_model_checkpoint})")
+    print(f"Best val F1 {best_val['f1']:.4f} ({info['best_checkpoint']})")
     print(f"Saved model + tokenizer to {out_dir}")
 
 

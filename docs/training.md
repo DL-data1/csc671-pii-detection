@@ -13,7 +13,7 @@
 | Model selection | best validation entity-level micro F1 (`load_best_model_at_end`) |
 | Hardware / time | RTX 2080 SUPER (8 GB), 202 s of training, torch 2.10 + transformers 5.23 |
 
-**Evaluation is document-level.** Each word's logits are averaged over every window that contains it, then whole documents are scored with seqeval (strict entity match on IOB2 spans). Overlapping windows are therefore not double-counted and nothing past 512 subwords is dropped.
+**Evaluation is document-level.** Each word's logits are averaged over every window that contains it, then whole documents are scored with seqeval (an entity counts only on an exact span-and-type match; seqeval default conlleval-style chunking). Overlapping windows are therefore not double-counted and nothing past 512 subwords is dropped.
 
 Reproduce: `python scripts/train.py --run-name full_baseline`. Full numbers, loss curve and per-epoch metrics: `docs/results/full_baseline.json`.
 
