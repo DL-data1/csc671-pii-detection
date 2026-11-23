@@ -7,48 +7,44 @@ from transformers import AutoTokenizer, AutoModelForTokenClassification
 """
 DistilBERT PII inference script.
 
-Loads a trained DistilBERT token-classification checkpoint and detects
-personally identifiable information (PII) in raw input text.
+1. 입력을 받는다.
+2. 단어별로 스플릿해서 위치를 기록한다.
+3. 토큰화한다.
+4. 모델을 이용해서 예측 결과를 받는다.
+5. 단어 단위 예측값 통합
+6. merge
+7. 최종결과 출력
+int main() {
+    string text = getInput();
 
-The script is designed to work with DistilBERT checkpoint,
-but it can load any compatible checkpoint directory using:
+    auto [words, offsets] = splitWords(text);
 
-    AutoTokenizer.from_pretrained(<dir>)
-    AutoModelForTokenClassification.from_pretrained(<dir>)
+    auto tokens = tokenizer.encode(words);
 
-The label mapping is read directly from the checkpoint's config.json through
-`model.config.id2label`, so no separate label file is required.
+    auto logits = model.forward(tokens);
 
-Important preprocessing:
-    The training data uses whitespace-split words with punctuation attached,
-    for example:
+    auto labels = aggregatePredictions(logits);
 
-        "Feng,"
-        "Drive."
-        "maria@example.com."
+    auto entities = mergeBIO(words, offsets, labels);
 
-    To match training behavior, inference also splits input text on whitespace
-    before tokenizing with:
+    printResults(text, entities);
+} 이런 구조다
 
-        is_split_into_words=True
 
-Prediction handling:
-    The model was trained using the label on only the first subword of each
-    original word. Other subwords were ignored with label -100.
-
-    During inference, this script:
-        1. Splits raw text into whitespace-separated words.
-        2. Tokenizes the words with the DistilBERT tokenizer.
-        3. Runs the token-classification model.
-        4. Keeps the prediction from the first subword of each word.
-        5. Merges B-/I- BIO predictions into complete PII entity spans.
-        6. Reconstructs character offsets in the original input text.
-        7. Prints detected PII spans, entity types, offsets, and highlighted text.
-
-Long input:
-    Input is currently truncated at 512 subword tokens to match the current
-    training setup. Sliding-window inference can be added later for longer
-    documents.
+Python	        C/C++
+list	        std::vector
+dict	        std::unordered_map 또는 std::map
+tuple	        std::tuple, std::pair
+set	             std::unordered_set 또는 std::set
+None	        값이 없음을 나타내는 상태, std::nullopt와 유사
+for x in items	    C++ range-based for
+enumerate(items)	인덱스와 원소를 함께 순회
+zip(a, b)	        여러 컨테이너를 병렬 순회
+len(items)	            items.size()
+items.append(x)	            items.push_back(x)
+dict[key]	            map[key]
+f"{value}"	            문자열 포매팅
+a, b = function()	C++17 structured binding과 유사
 
 Usage:
     python scripts/predict.py --model models/distilbert-small \
@@ -64,15 +60,15 @@ Example output:
 """
 
 
-def split_words_with_offsets(text):
+def split_words(text): # predict에서 호출하는 함수다
     words = []
     offsets = []
 
-    for match in re.finditer(r"\S+", text):
-        words.append(match.group())
-        offsets.append((match.start(), match.end()))
+    for i in re.finditer(r"\S+", text): # /S+: 공백문자가 아닌 하나이상의 연속문자. 이걸 찾는다 text안에서
+        words.append(i.group()) # words배열에 단어 기록
+        offsets.append((i.start(), i.end())) # offfsets에 시작 주소와 마지막 주소를 적는다.(개인정보룰 발견시에 거기가 어딘지 알아야해서)
 
-    return words, offsets
+    return words, offsets 
 
 
 def merge_bio_predictions(words, offsets, labels):
@@ -153,84 +149,120 @@ def redact_text(text, entities):
     return result
 
 
-def predict(model_path, text):
+def predict(model_path, text): # 1번쨰로 실행되는 함수다.
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device( # cpu혹은 gpu를 선택한다.
+        "cuda" if torch.cuda.is_available() else "cpu"
+    )
 
-    print("Device:", device)
+    print("Selected Device:", device)
 
-    tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=True)
+    tokenizer = AutoTokenizer.from_pretrained( # tokenizer를 불러오는 역할이다.
+        model_path, # read dir
+        use_fast=True
+    )
 
-    model = AutoModelForTokenClassification.from_pretrained(model_path)
+    model = AutoModelForTokenClassification.from_pretrained( # trained distilbert모델을 불러오기
+        model_path
+    )
 
-    model.to(device)
-    model.eval()
+    model.to(device) # let model move to device
+    model.eval() # set evaluation mode
 
-    words, offsets = split_words_with_offsets(text)
+    words, offsets = split_words(text) # split함수 호출해서 나눈다.
 
-    encoding = tokenizer(
-        words,
-        is_split_into_words=True,
-        truncation=True,
-        max_length=512,
-        stride=128,
-        return_overflowing_tokens=True,
-        padding="max_length",
-        return_tensors="pt",
+    if not words: # if empty -> end
+        return [], 0, 0
+
+    encoding = tokenizer( # execute tokenizer
+        words, # word -> num
+        is_split_into_words=True, # we already spilted before
+        truncation=True, # if too long -> cut, but there is overflowing below
+        max_length=512, # window size : 1window = 512 token
+        stride=128, # make duplicated area. 예를들어 1~512->window1, (512-128)~(512-128+512) -> window2.
+        return_overflowing_tokens=True, # if need -> make more window
+        padding="max_length", # 빈 토큰으로 윈도우의 빈칸을 채워서 512개의 토큰으로 만들어버린다?? 왜?
+        return_tensors="pt" # 결과를 pytorch tensor로 변환해라.
     )
 
     model_inputs = {
-        key: value.to(device)
-        for key, value in encoding.items()
-        if key in tokenizer.model_input_names
+        key: value.to(device) # move tensor to gpu
+        for key, value in encoding.items() # encoding값을 불러온다.
+        if key in tokenizer.model_input_names # 필요한거만
     }
 
-    with torch.no_grad():
-        outputs = model(**model_inputs)
+    with torch.no_grad(): # we don't need to train now; take off for my memory
+        outputs = model(**model_inputs) # **는 모델input들을 말함. forward 연산 실행 outputs에 결과를 저장한다.
 
-    predicted_ids = torch.argmax(outputs.logits, dim=-1).cpu().tolist()
+    all_logits = outputs.logits.detach().cpu() # 각 클래스에 대해 분류점수들을 보고 softmax처럼 그리고 텐서를 분리하여 cpu로 이동시킨다. 결과집계는 cpu에서
 
-    word_predictions = {}
+    num_windows = all_logits.shape[0] # num of window/ shape(3,512,5) -> 3windows with 512token each and label : 5
 
-    num_windows = len(predicted_ids)
+    word_logit_sums = {} # 같은 단어를 합치기 위한 구조다. 각단어의 logit의 합을 저장? n번단어의 벡터값의 합
+    word_logit_counts = {} #각 단어의 logit를 몇번 합쳤는지 카운팅? 그게 몇개의 윈도우에서 나왔는가
 
     for window_index in range(num_windows):
 
-        word_ids = encoding.word_ids(batch_index=window_index)
+        word_ids = encoding.word_ids( # 이 토큰이 어느 단어에 속하는가 ex) ts@as.com -> word = 1 token = 5
+            batch_index=window_index
+        )
 
-        seen_in_window = set()
+        seen_in_window = set() # prevent duplication
 
         for token_index, word_id in enumerate(word_ids):
 
-            if word_id is None:
+            if word_id is None: # skip none
                 continue
 
-            if word_id in seen_in_window:
+            if word_id in seen_in_window: # skip if we already check same word.
                 continue
 
-            seen_in_window.add(word_id)
+            seen_in_window.add(word_id) # 처리한것은 더이상 못하도록 visit처리하는거임
 
+            logits = all_logits[ # token의 logit을 가져온다? logit가 뭐지? -? x번 윈도우의y번 토큰에 대한 각label점수들을 말하는거 같다.
+                window_index,
+                token_index
+            ]
 
-            if word_id in word_predictions:
-                continue
+            if word_id not in word_logit_sums: # 단어별 logit이 처음 나왔는지를 체크하는 것이다.
+                word_logit_sums[word_id] = logits.clone() # 처음이면 logit를 복사해서 저장 갯수를 1로
+                word_logit_counts[word_id] = 1
+            else:
+                word_logit_sums[word_id] += logits # 이미 나왔으면 logit을 더하고 갯수를 증가 이후에 이것들의 평균을 구할거임
+                word_logit_counts[word_id] += 1
 
-            label_id = predicted_ids[window_index][token_index]
+    word_labels = [] # 최종 label저장
+    processed_count = 0 # 실제 예측점수
 
-            label = model.config.id2label[label_id]
+    for word_id in range(len(words)): # 원본 단어를 전부 순회한다.
 
-            word_predictions[word_id] = label
+        if word_id not in word_logit_sums: # 처리 되지 않은 단어(no logit) -> not pii
+            word_labels.append("O")
+            continue
 
-    word_labels = []
+        average_logits = ( # 평균을 구한다.
+            word_logit_sums[word_id]
+            / word_logit_counts[word_id]
+        )
 
-    for word_id in range(len(words)):
-        label = word_predictions.get(word_id, "O")
-        word_labels.append(label)
+        label_id = torch.argmax( # 가장 높은 것을 반환한다.
+            average_logits
+        ).item()
 
-    entities = merge_bio_predictions(words, offsets, word_labels)
+        label = model.config.id2label[label_id] # num -> name ex) 1-> B-name
 
-    print("Windows processed:", num_windows)
+        word_labels.append(label) #lable를 추가 ex) ["O", "O", "O", "B-NAME_STUDENT", "I-NAME_STUDENT"]
+        processed_count += 1#카운팅
 
-    return entities, len(words), len(words)
+    entities = merge_bio_predictions( #ex) John  → B-NAME_STUDENT --->{ "type": "NAME_STUDENT","start": 11, "end": 21} 왜하는거지?
+        words,
+        offsets,
+        word_labels
+    )
+
+    print("Windows processed:", num_windows) # 처리한 윈도우 수 출력 디버깅용
+
+    return entities, processed_count, len(words) # 최종 결과를 반환한다.
 
 
 def main():

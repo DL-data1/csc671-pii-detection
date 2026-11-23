@@ -58,3 +58,71 @@ Notes
 - Some EMAIL predictions are also inconsistent.
 - Punctuation may be included in detected spans because training uses whitespace-split words with punctuation attached.
 - Re-run the same examples with Kyle's best checkpoint for the final comparison.
+
+
+
+
+
+Full baseline checkpoint results
+Model: models/full_baseline
+
+Overall summary
+---------------
+NAME_STUDENT: PASS
+- Names were detected correctly in the tested examples.
+
+STREET_ADDRESS: PASS
+- Street addresses were detected correctly in the tested examples.
+
+EMAIL: PASS
+- Email addresses were detected correctly in the tested examples.
+
+USERNAME: PASS
+- Username detection improved significantly compared with the small checkpoint.
+- Examples such as maria99, aliceb, sarahlee88, dk123, testuser99, and roberts88 were detected correctly.
+
+URL_PERSONAL: PASS
+- URL detection improved significantly compared with the small checkpoint.
+- Examples such as https://example.com, https://davidkim.dev, https://example.net, and https://robertsmith.me were detected correctly.
+
+PHONE_NUM: PARTIAL
+- Some phone numbers were detected correctly.
+- The US phone format xxx-xxx-xxxx is still inconsistent.
+- 3 of the 5 tested US-style phone numbers were incorrectly classified as STREET_ADDRESS.
+- This matches the known limitation that this phone format does not appear in the training data.
+
+No-PII example: PASS
+- The sentence containing no personal information produced no detected entities.
+
+Comparison with small checkpoint
+--------------------------------
+The full baseline model showed a large improvement over the small checkpoint, especially for USERNAME and URL_PERSONAL.
+
+Small checkpoint:
+- USERNAME: weak / often missed or classified as EMAIL
+- URL_PERSONAL: usually missed
+- EMAIL: some misses
+- PHONE_NUM: generally better on the small example set
+
+Full baseline:
+- USERNAME: detected correctly in the tested examples
+- URL_PERSONAL: detected correctly in the tested examples
+- EMAIL: detected correctly in the tested examples
+- PHONE_NUM: still weak for unseen US-style phone formats
+
+Notes
+-----
+- The inference pipeline works with the full baseline checkpoint.
+- Highlighted text, JSON output, redaction, and sliding-window inference are working.
+- Long documents are processed using overlapping 512-subword windows with a 128-subword overlap.
+- The current inference implementation averages word logits across overlapping windows to match the training and validation procedure.
+- The full baseline is the current best checkpoint, but it may be replaced by a later tuned model.
+- All prompt templates appear across train, validation, and test, so the reported performance mainly reflects in-template performance rather than fully unseen-template generalization.
+
+Long-input sliding-window test: PASS
+- 3 windows were processed.
+- PII located beyond the first 512 subword tokens was successfully detected.
+- NAME_STUDENT and URL_PERSONAL were detected correctly.
+- USERNAME (testuser99) was missed in the long-context example.
+- The same username was detected correctly in the equivalent short-context example, suggesting a context/window-related model prediction difference rather than an inference pipeline failure.
+
