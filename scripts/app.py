@@ -29,7 +29,7 @@ from predict import predict, highlight_text, redact_text
 
 
 
-MODEL_PATH = "models/full_baseline"
+MODEL_PATH = "models/uncased"  # final model (#8); unzip the ckpt-uncased-v1 release into models/
 
 
 def run_detection(text):
