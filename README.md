@@ -18,6 +18,20 @@ python scripts/train_small.py
 
 Options: `--train-docs`, `--val-docs` (0 = all), `--epochs`, `--lr`, `--batch-size`, `--output`.
 
+## Full training run (issue #5)
+
+Trains `distilbert-base-cased` on the full train split, evaluates on validation every epoch, and keeps the checkpoint with the best validation entity-level F1:
+
+```bash
+python scripts/train.py                          # defaults: 5 epochs, lr 5e-5, batch 8 -> models/full_baseline/
+python scripts/train.py --lr 3e-5 --run-name lr3e-5
+```
+
+- **Long documents:** split into overlapping windows of 512 subwords with a 128-subword overlap (`src/windows.py`). Training uses every window.
+- **Validation is document-level:** each word's logits are averaged over all windows that contain it, then seqeval scores whole documents. Nothing is truncated or double-counted.
+- **Outputs:** the best model + tokenizer, `train_info.json` (hyperparameters, per-epoch metrics, loss curve, runtime, GPU) and `val_report.txt` in `models/<run-name>/`. A copy of the summary goes to `docs/results/<run-name>.json` (tracked) for the experiment table. Results are written up in `docs/training.md`.
+- The test split is never used for training or model selection.
+
 The label set lives in `src/labels.py` (13 BIO tags). The checkpoint's `config.json` stores `id2label`, so any checkpoint directory loads with `AutoModelForTokenClassification.from_pretrained(<dir>)`.
 
 **Inference input:** the training `tokens` are whitespace-split words with punctuation attached (e.g. `"Feng,"`). Split raw text with `text.split()` and tokenize with `is_split_into_words=True`; read each word's label from its first subword.
