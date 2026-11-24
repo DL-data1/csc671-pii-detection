@@ -6,7 +6,18 @@ from transformers import AutoTokenizer, AutoModelForTokenClassification
 
 """
 DistilBERT PII inference script.
+Usage:
+    python scripts/predict.py --model models/distilbert-small \
+        "My name is John Smith and my email is john@example.com."
 
+Example output:
+    'John Smith'         type=NAME_STUDENT
+    'john@example.com.'  type=EMAIL
+
+    Highlighted text:
+    My name is [[NAME_STUDENT: John Smith]] and my email is
+    [[EMAIL: john@example.com.]]
+    
 1. 입력을 받는다.
 2. 단어별로 스플릿해서 위치를 기록한다.
 3. 토큰화한다.
@@ -32,6 +43,7 @@ int main() {
 
 
 Python	        C/C++
+
 list	        std::vector
 dict	        std::unordered_map 또는 std::map
 tuple	        std::tuple, std::pair
@@ -45,18 +57,6 @@ items.append(x)	            items.push_back(x)
 dict[key]	            map[key]
 f"{value}"	            문자열 포매팅
 a, b = function()	C++17 structured binding과 유사
-
-Usage:
-    python scripts/predict.py --model models/distilbert-small \
-        "My name is John Smith and my email is john@example.com."
-
-Example output:
-    'John Smith'         type=NAME_STUDENT
-    'john@example.com.'  type=EMAIL
-
-    Highlighted text:
-    My name is [[NAME_STUDENT: John Smith]] and my email is
-    [[EMAIL: john@example.com.]]
 """
 
 
@@ -71,30 +71,30 @@ def split_words(text): # predict에서 호출하는 함수다
     return words, offsets 
 
 
-def merge_bio_predictions(words, offsets, labels):
+def merge_bio_predictions(words, offsets, labels): # 찾은 개인정보들만 기록하는거임
     entities = []
-    current = None
+    current = None # 현재 merge하고 있는 개인정보
 
-    for word, (start, end), label in zip(words, offsets, labels):
+    for word, (start, end), label in zip(words, offsets, labels): # 3개의 배열을 동시에 순회하는거임
 
         if label == "O":
-            if current is not None:
+            if current is not None: # 결과를 저장한다.
                 entities.append(current)
                 current = None
             continue
 
-        if "-" not in label:
+        if "-" not in label: # 형식에 맞는지 체크
             continue
 
-        prefix, entity_type = label.split("-", 1)
+        prefix, entity_type = label.split("-", 1) #split prefix in the word
 
-        if prefix == "B":
+        if prefix == "B": # Begin -> its new pii
             if current is not None:
                 entities.append(current)
 
             current = {"type": entity_type, "start": start, "end": end}
 
-        elif prefix == "I":
+        elif prefix == "I":# inner -> add 
             if current is not None and current["type"] == entity_type:
                 current["end"] = end
 
@@ -130,7 +130,7 @@ def highlight_text(text, entities):
     return result
 
 
-def redact_text(text, entities):
+def redact_text(text, entities): # masking func
     result = ""
     last_end = 0
 
@@ -267,22 +267,22 @@ def predict(model_path, text): # 1번쨰로 실행되는 함수다.
 
 def main():
 
-    parser = argparse.ArgumentParser(
+    parser = argparse.ArgumentParser( # c++: argc, argv 중 argv를 파서에 담는다
         description="Detect PII using a DistilBERT checkpoint"
     )
 
-    parser.add_argument("--model", required=True, help="Path to checkpoint directory")
+    parser.add_argument("--model", required=True, help="Path to checkpoint directory") # 모델옵션 --model models/full_baseline
 
-    parser.add_argument("text", help="Text to scan for PII")
-    parser.add_argument(
+    parser.add_argument("text", help="Text to scan for PII") # text를 저장하는거같음 따로 추출해서
+    parser.add_argument( # mask option
         "--redact",
         action="store_true",
         help="Replace detected PII with entity type labels",
     )
 
-    args = parser.parse_args()
+    args = parser.parse_args() # make args
 
-    entities, processed, total = predict(args.model, args.text)
+    entities, processed, total = predict(args.model, args.text) # 함수 호출한다.
 
     print("\nDetected PII:")
     print("-" * 70)
@@ -293,10 +293,10 @@ def main():
     else:
         for entity in entities:
 
-            span = args.text[entity["start"] : entity["end"]]
+            span = args.text[entity["start"] : entity["end"]] # 개인정보 위치의 문자를 찾는다.
 
             print(
-                f"{span!r:30} "
+                f"{span!r:30} "  #r : repr() make S
                 f"type={entity['type']:20} "
                 f"offset=({entity['start']}, {entity['end']})"
             )
@@ -326,10 +326,7 @@ def main():
         print("-" * 70)
         print(redact_text(args.text, entities))
 
-    if processed < total:
-        print(
-            f"\nWarning: input was truncated " f"({processed}/{total} words processed)."
-        )
+
 
 
 if __name__ == "__main__":
