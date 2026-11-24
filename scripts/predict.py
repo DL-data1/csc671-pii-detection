@@ -7,7 +7,7 @@ from transformers import AutoTokenizer, AutoModelForTokenClassification
 """
 DistilBERT PII inference script.
 Usage:
-    python scripts/predict.py --model models/distilbert-small \
+    python scripts/predict.py --model models/uncased \
         "My name is John Smith and my email is john@example.com."
 
 Example output:
@@ -181,7 +181,7 @@ def predict(model_path, text): # 1번쨰로 실행되는 함수다.
         max_length=512, # window size : 1window = 512 token
         stride=128, # make duplicated area. 예를들어 1~512->window1, (512-128)~(512-128+512) -> window2.
         return_overflowing_tokens=True, # if need -> make more window
-        padding="max_length", # 빈 토큰으로 윈도우의 빈칸을 채워서 512개의 토큰으로 만들어버린다?? 왜?
+        padding="max_length", # 빈 토큰으로 윈도우의 빈칸을 채워서 512개의 토큰으로 만들어버린다?? 왜? -> 여러 윈도우를 한 tensor에 넣으려면 길이를 맞춰야
         return_tensors="pt" # 결과를 pytorch tensor로 변환해라.
     )
 
@@ -194,7 +194,7 @@ def predict(model_path, text): # 1번쨰로 실행되는 함수다.
     with torch.no_grad(): # we don't need to train now; take off for my memory
         outputs = model(**model_inputs) # **는 모델input들을 말함. forward 연산 실행 outputs에 결과를 저장한다.
 
-    all_logits = outputs.logits.detach().cpu() # 각 클래스에 대해 분류점수들을 보고 softmax처럼 그리고 텐서를 분리하여 cpu로 이동시킨다. 결과집계는 cpu에서
+    all_logits = outputs.logits.detach().cpu() # 각 클래스에 대해 분류점수들을 보고 높은값을 고른다 그리고 텐서를 분리하여 cpu로 이동시킨다. 결과집계는 cpu에서
 
     num_windows = all_logits.shape[0] # num of window/ shape(3,512,5) -> 3windows with 512token each and label : 5
 
@@ -232,7 +232,7 @@ def predict(model_path, text): # 1번쨰로 실행되는 함수다.
                 word_logit_counts[word_id] += 1
 
     word_labels = [] # 최종 label저장
-    processed_count = 0 # 실제 예측점수
+    processed_count = 0 # Number of original words that received predictions
 
     for word_id in range(len(words)): # 원본 단어를 전부 순회한다.
 

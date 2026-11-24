@@ -48,17 +48,17 @@ The label set lives in `src/labels.py` (13 BIO tags). The checkpoint's `config.j
 
 
 ## Inference
-Current inference checkpoint: models/full_baseline
-Run PII detection with a compatible checkpoint:
+Final model: distilbert-base-uncased
+Validation F1: 0.985
 
 ```bash
-python scripts/predict.py --model models/distilbert-small "My name is John Smith and my email is john@example.com."
+python  scripts/predict.py --model models/uncased  "My name is John Smith and my email is john@example.com."
 ```
 
 Optional redaction mode:
 
 ```bash
-python scripts/predict.py --model models/distilbert-small --redact "My name is John Smith and my email is john@example.com."
+python scripts/predict.py --model models/uncased  --redact "My name is John Smith and my email is john@example.com."
 ```
 
 The inference script supports:

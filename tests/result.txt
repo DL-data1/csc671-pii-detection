@@ -57,7 +57,6 @@ Notes
 - The current small checkpoint is weak on USERNAME and URL_PERSONAL.
 - Some EMAIL predictions are also inconsistent.
 - Punctuation may be included in detected spans because training uses whitespace-split words with punctuation attached.
-- Re-run the same examples with Kyle's best checkpoint for the final comparison.
 
 
 
@@ -124,5 +123,121 @@ Long-input sliding-window test: PASS
 - PII located beyond the first 512 subword tokens was successfully detected.
 - NAME_STUDENT and URL_PERSONAL were detected correctly.
 - USERNAME (testuser99) was missed in the long-context example.
-- The same username was detected correctly in the equivalent short-context example, suggesting a context/window-related model prediction difference rather than an inference pipeline failure.
 
+
+
+Final Model Test Results
+========================
+
+Model: models/uncased
+Checkpoint: ckpt-uncased-v1
+Base model: distilbert-base-uncased
+
+This is the final frozen PII model from issue #8 and replaces the previous full_baseline checkpoint.
+
+Official validation performance
+-------------------------------
+Validation documents: 443
+Precision: 0.987
+Recall: 0.984
+F1: 0.985
+
+The model uses 13 BIO labels and supports long inputs using 512-subword windows with a 128-subword overlap. Predictions for words appearing in overlapping windows are combined by averaging their logits.
+
+Manual inference test results
+-----------------------------
+
+NAME_STUDENT: PASS
+- John Smith
+- Maria Lopez
+- Alice Brown
+- David Kim
+- Sarah Lee
+- Emily Chen
+- John Miller
+- Robert Smith
+
+Names were detected reliably across the example sentences.
+
+STREET_ADDRESS: PASS
+- 123 Market Street
+- 99 Mission Street
+- 456 Oak Avenue
+- 88 Pine Street
+- 21 Mission Street
+
+Street addresses were detected correctly in the tested examples.
+
+EMAIL: PASS / MINOR LIMITATION
+Correct examples included:
+- john@example.com
+- alice@test.com
+- david.kim@example.com
+- emily@example.org
+- john@example.com
+- alice@example.com
+- robert@test.com
+
+Known failure:
+- test@example.net was not detected.
+
+USERNAME: PASS / MINOR LIMITATION
+Correct examples included:
+- maria99
+- aliceb
+- sarahlee88
+- testuser99
+- roberts88
+
+Known failure:
+- dk123 was not detected.
+
+URL_PERSONAL: PASS
+Correct examples included:
+- https://example.com
+- https://davidkim.dev
+- https://example.net
+- https://robertsmith.me
+
+PHONE_NUM: KNOWN WEAKNESS
+The final uncased model performs poorly on U.S.-style phone numbers in the form xxx-xxx-xxxx.
+
+Results from five test examples:
+- 415-555-1234 -> missed
+- 650-555-9876 -> missed
+- 408-555-4321 -> incorrectly classified as STREET_ADDRESS
+- 650-555-2468 -> missed
+- 415-555-7788 -> missed
+
+Summary:
+- 4 of 5 U.S.-style phone numbers were missed.
+- 1 of 5 was incorrectly classified as STREET_ADDRESS.
+- This matches the known limitation documented for the final checkpoint.
+- This phone-number format was absent from the training data.
+
+No-PII test: PASS
+-----------------
+The sentence containing no personal information produced:
+- No detected entities
+- Empty JSON output
+
+Inference pipeline status
+-------------------------
+PASS:
+- Final uncased checkpoint loads correctly.
+- PII entities are detected and merged from BIO predictions.
+- Character offsets are preserved.
+- Highlighted output works.
+- JSON output works.
+- Redaction support is available.
+- Sliding-window inference supports inputs longer than 512 subword tokens.
+- Overlapping-window logits are averaged before selecting the final word label.
+- Original input text is preserved; the uncased tokenizer handles lowercasing internally.
+
+Overall conclusion
+------------------
+The final uncased checkpoint is successfully integrated into the inference pipeline and web application.
+
+Compared with the previous cased baseline, the final model has stronger validation performance and improved generalization. Most tested PII categories are detected reliably.
+
+The main remaining weakness is U.S.-style phone numbers. The model also missed dk123 and test@example.net in the manual examples. These are model limitations.
