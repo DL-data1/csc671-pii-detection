@@ -72,19 +72,6 @@ Example prompts are available in `tests/examples.txt`.
 
 The script loads the tokenizer and model from the checkpoint directory, merges BIO predictions into complete PII spans, and prints the detected entity type, character offsets, and highlighted text.
 
-Example output:
-
-```text
-Detected PII:
-----------------------------------------------------------------------
-'John Smith'                   type=NAME_STUDENT         offset=(11, 21)
-'john@example.com.'            type=EMAIL                offset=(38, 55)
-
-Highlighted text:
-----------------------------------------------------------------------
-My name is [[NAME_STUDENT: John Smith]] and my email is [[EMAIL: john@example.com.]]
-```
-
 Long inputs are handled with sliding-window inference so text beyond the first 512 subword tokens can also be processed.
 
 ## Web UI
@@ -120,34 +107,4 @@ g++ scripts/regex_cli.cpp scripts/regex_base.cpp -o regex_cli
 
 ```powershell
 python scripts/regex_eval.py
-```
-
-By default, the evaluator reads:
-
-
-Example output:
-
-```text
-Regex baseline
-========================================
-
-OVERALL
-Precision: 0.9215
-Recall:    0.9668
-F1:        0.9436
-
-EMAIL
-Precision: 0.9358
-Recall:    0.9870
-F1:        0.9607
-
-PHONE_NUM
-Precision: 0.9383
-Recall:    0.9421
-F1:        0.9402
-
-URL_PERSONAL
-Precision: 0.7949
-Recall:    0.9394
-F1:        0.8611
 ```
