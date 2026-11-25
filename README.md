@@ -114,11 +114,6 @@ From the project root directory:
 g++ scripts/regex_cli.cpp scripts/regex_base.cpp -o regex_cli
 ```
 
-This creates:
-
-```text
-regex_cli.exe
-```
 
 
 ### Evaluate on the Test Set
