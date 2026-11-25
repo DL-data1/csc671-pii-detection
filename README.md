@@ -96,3 +96,73 @@ Run it from the project root:
 python scripts/app.py
 
 Then open the local URL shown in the terminal (usually http://127.0.0.1:7860) in a browser.
+
+## Regex Baseline
+
+A simple regex-based baseline is provided for detecting the following PII types:
+
+EMAIL
+
+PHONE_NUM
+
+URL_PERSONAL
+
+The implementation is located in:
+
+scripts/regex_base.cpp
+scripts/regex_base.h
+scripts/regex_eval.cpp
+
+Compile
+
+From the project root directory, run:
+
+g++ scripts/regex_eval.cpp scripts/regex_base.cpp -o regex_eval
+
+Run
+
+.\regex_eval.exe
+
+The evaluator reads:
+
+data/raw/test.csv
+
+and compares the regex predictions against the gold PII labels.
+
+The terminal will display Precision, Recall, and F1 scores for each supported PII category.
+
+Example:
+
+Regex baseline evaluation
+====================================================
+
+EMAIL
+Precision: 0.948148
+Recall:    1.000000
+F1:        0.973384
+
+PHONE_NUM
+Precision: 0.962963
+Recall:    0.966942
+F1:        0.964948
+
+URL_PERSONAL
+Precision: 0.846154
+Recall:    1.000000
+F1:        0.916667
+
+Detailed Results
+
+The evaluator also creates:
+
+regex_results.txt
+
+This file contains the original text, gold entities, regex predictions, and the result for each detected entity.
+
+Each prediction is marked as one of:
+
+CORRECT
+MISSED
+FALSE_POSITIVE
+
+This output can be used for manual error analysis of the regex baseline
